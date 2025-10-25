@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, CommandInteraction, Events, GatewayIntentBits, Interaction } from 'discord.js';
 import { EntityRegistry, repository } from '@outof-coffee/cordex';
 import { BotConfig } from './config/bot-config.js';
 import { GuildInfo } from './entities/guild-info.js';
@@ -84,23 +84,39 @@ export class Bot {
             throw new Error('Bot must be initialized before running');
         }
 
+        this.attachCommandHandlers();
+
         this.eventManager.attachHandlers(this.client);
 
         await this.client.login(this.discordToken);
     }
 
+    // MARK: - Private methods
     private registerCommands() {
         const guildManagement = new GuildManagement(this.managementGuildId, this.botId);
         this.commandHandlers.push(guildManagement);
+    }
 
+    private attachCommandHandlers() {
         for (const handler of this.commandHandlers) {
             if (handler.registerCommandEvents) {
                 handler.registerCommandEvents(this.eventManager);
+            } else {
+                // since we know it's a command, because it implements CommandHandler, we can register a default interaction handler, as long as the interaction implements CommandInteraction
+                this.eventManager.registerHandler({
+                    event: Events.InteractionCreate,
+                    handle: async (interaction: Interaction) => {
+                        if (!interaction.isChatInputCommand()) return;
+                        if (interaction.commandName === handler.data.name) {
+                            await handler.execute(interaction as CommandInteraction);
+                        }
+                    }
+                });
             }
         }
     }
 
-    // private members
+    // MARK: - Private members
     private discordToken: string;
     private databasePath: string;
     private managementGuildId: string;
