@@ -1,0 +1,33 @@
+{
+  "name": "@outof-coffee/sarge",
+  "version": "0.0.1",
+  "description": "discord bot for managing nerds playing in an mmo guild / tribe / corporation",
+  "keywords": [
+    "discord",
+    "gaming",
+    "mmo"
+  ],
+  "homepage": "https://github.com/outof-coffee/sarge#readme",
+  "bugs": {
+    "url": "https://github.com/outof-coffee/sarge/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outof-coffee/sarge.git"
+  },
+  "license": "MIT",
+  "author": "outof-coffee",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.3"
+  },
+  "dependencies": {
+    "@outof-coffee/cordex": "^0.0.1"
+  }
+}
