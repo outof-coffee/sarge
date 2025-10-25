@@ -1,6 +1,41 @@
 import { DatabaseEntity, IdentifiedEntity } from '@outof-coffee/cordex';
 import { Guild } from 'discord.js';
 
+export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
+  static readonly storageKey = 'guild-registry';
+
+  readonly guildId: string;
+  readonly guildName: string;
+  readonly joinedAt: Date;
+  readonly lastSeen: Date;
+  readonly memberCount: number;
+  readonly ownerId: string;
+  readonly flag: GuildFlag;
+
+  constructor(
+    guildId: string,
+    guildName: string,
+    joinedAt: Date,
+    lastSeen: Date,
+    memberCount: number,
+    ownerId: string,
+    flag: GuildFlag = GuildFlag.Green
+  ) {
+    super();
+    this.guildId = guildId;
+    this.guildName = guildName;
+    this.joinedAt = joinedAt;
+    this.lastSeen = lastSeen;
+    this.memberCount = memberCount;
+    this.ownerId = ownerId;
+    this.flag = flag;
+  }
+
+  get id(): string {
+    return "guild-" + this.guildId;
+  }
+}
+
 export enum GuildFlag {
   Green = 'green',
   Yellow = 'yellow',
@@ -43,39 +78,4 @@ export function calculateGuildFlag(existingInfo: GuildInfo | undefined, guildDat
   }
 
   return GuildFlag.Green;
-}
-
-export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
-  static readonly storageKey = 'guild-registry';
-
-  readonly guildId: string;
-  readonly guildName: string;
-  readonly joinedAt: Date;
-  readonly lastSeen: Date;
-  readonly memberCount: number;
-  readonly ownerId: string;
-  readonly flag: GuildFlag;
-
-  constructor(
-    guildId: string,
-    guildName: string,
-    joinedAt: Date,
-    lastSeen: Date,
-    memberCount: number,
-    ownerId: string,
-    flag: GuildFlag = GuildFlag.Green
-  ) {
-    super();
-    this.guildId = guildId;
-    this.guildName = guildName;
-    this.joinedAt = joinedAt;
-    this.lastSeen = lastSeen;
-    this.memberCount = memberCount;
-    this.ownerId = ownerId;
-    this.flag = flag;
-  }
-
-  get id(): string {
-    return "guild-" + this.guildId;
-  }
 }
