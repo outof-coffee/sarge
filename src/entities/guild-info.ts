@@ -1,4 +1,4 @@
-import { DatabaseEntity } from '@outof-coffee/cordex';
+import { DatabaseEntity, IdentifiedEntity } from '@outof-coffee/cordex';
 import { Guild } from 'discord.js';
 
 export enum GuildFlag {
@@ -45,7 +45,7 @@ export function calculateGuildFlag(existingInfo: GuildInfo | undefined, guildDat
   return GuildFlag.Green;
 }
 
-export class GuildInfo extends DatabaseEntity {
+export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
   static readonly storageKey = 'guild-registry';
 
   readonly guildId: string;
@@ -73,5 +73,9 @@ export class GuildInfo extends DatabaseEntity {
     this.memberCount = memberCount;
     this.ownerId = ownerId;
     this.flag = flag;
+  }
+
+  get id(): string {
+    return "guild-" + this.guildId;
   }
 }
