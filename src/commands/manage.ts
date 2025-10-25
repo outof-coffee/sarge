@@ -1,6 +1,15 @@
-import { SlashCommandBuilder, CommandInteraction, InteractionReplyOptions, MessageFlags, Interaction, ChatInputCommandInteraction, CacheType } from 'discord.js';
+import { 
+  SlashCommandBuilder, 
+  CommandInteraction, 
+  InteractionReplyOptions, 
+  MessageFlags, 
+  Interaction, 
+  ChatInputCommandInteraction, 
+  CacheType 
+} from 'discord.js';
+
 import { repository } from '@outof-coffee/cordex';
-import { GuildInfo, GuildFlag } from '../entities/guild-info.js';
+import { GuildInfo, calculateGuildFlag } from '../entities/guild-info.js';
 import { EventHandler, EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
@@ -47,7 +56,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
         now,
         guild.memberCount,
         guild.ownerId,
-        existingInfo?.flag ?? GuildFlag.Green
+        calculateGuildFlag(existingInfo, guild)
       );
 
       await repository.store(guildInfo);
