@@ -1,7 +1,7 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, CacheType, Interaction, CommandInteraction, InteractionReplyOptions, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, InteractionReplyOptions, MessageFlags } from 'discord.js';
 import { repository } from '@outof-coffee/cordex';
 import { GuildInfo, GuildFlag } from '../entities/guild-info.js';
-import { EventHandler, EventManager } from '../event-manager.js';
+import { EventHandler } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
 
@@ -10,19 +10,9 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
   private managementGuildId: string;
   private botId: string;
 
-  constructor(managementGuildId: string, botId: string, eventManager: EventManager) {
+  constructor(managementGuildId: string, botId: string) {
     this.managementGuildId = managementGuildId;
     this.botId = botId;
-    eventManager.registerHandler(this);
-    eventManager.registerHandler({
-      event: Events.InteractionCreate,
-      handle: async (interaction: Interaction) => {
-        if (!interaction.isChatInputCommand()) return;
-        if (interaction.commandName === this.data.name) {
-          await this.execute(interaction as ChatInputCommandInteraction<CacheType>);
-        }
-      } 
-    })
   }
 
   event: Events.ClientReady = Events.ClientReady;

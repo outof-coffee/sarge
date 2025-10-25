@@ -5,6 +5,7 @@ async function main() {
   loadEnv();
   const bot = new Bot();
   await bot.initialize();
+  await bot.run();
 }
 
 main().catch(console.error);

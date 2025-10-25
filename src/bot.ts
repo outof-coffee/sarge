@@ -1,98 +1,118 @@
-import { Client, GatewayIntentBits } from 'discord.js';
+import { CacheType, ChatInputCommandInteraction, Client, Events, GatewayIntentBits, Interaction } from 'discord.js';
 import { EntityRegistry, repository } from '@outof-coffee/cordex';
 import { BotConfig } from './config/bot-config.js';
-import { GuildInfo, GuildFlag } from './entities/guild-info.js';
+import { GuildInfo } from './entities/guild-info.js';
 import { VERSION } from './version.js';
 import { EventManager } from './event-manager.js';
-import { env } from 'process';
 import { GuildManagement } from './commands/manage.js';
+import { CommandHandler } from './command-handler.js';
 
 export class Bot {
 
-  constructor() {
-    const envDiscordToken = process.env.DISCORD_TOKEN;
-    const envManagementGuildId = process.env.MANAGEMENT_GUILD_ID;
-    const envBotId = process.env.BOT_ID;
+    constructor() {
+        const envDiscordToken = process.env.DISCORD_TOKEN;
+        const envManagementGuildId = process.env.MANAGEMENT_GUILD_ID;
+        const envBotId = process.env.BOT_ID;
 
-    this.databasePath = process.env.DATABASE_PATH || './data/bot-database.json';
+        this.databasePath = process.env.DATABASE_PATH || './data/bot-database.json';
 
-    if (!envDiscordToken) {
-      throw new Error('DISCORD_TOKEN environment variable is required');
+        if (!envDiscordToken) {
+            throw new Error('DISCORD_TOKEN environment variable is required');
+        }
+
+        this.discordToken = envDiscordToken;
+
+        if (!envManagementGuildId) {
+            throw new Error('MANAGEMENT_GUILD_ID environment variable is required');
+        }
+
+        this.managementGuildId = envManagementGuildId;
+
+        if (!envBotId) {
+            throw new Error('BOT_ID environment variable is required');
+        }
+
+        this.botId = envBotId;
+
+        this.client = new Client({
+            intents: [
+                GatewayIntentBits.Guilds,
+                GatewayIntentBits.GuildMembers,
+                GatewayIntentBits.GuildExpressions,
+                GatewayIntentBits.GuildInvites,
+                GatewayIntentBits.GuildMessages,
+                GatewayIntentBits.GuildMessageReactions,
+                GatewayIntentBits.GuildMessageTyping,
+                GatewayIntentBits.DirectMessages,
+                GatewayIntentBits.DirectMessageReactions,
+                GatewayIntentBits.DirectMessageTyping,
+                GatewayIntentBits.MessageContent,
+                GatewayIntentBits.GuildScheduledEvents,
+                GatewayIntentBits.GuildMessagePolls,
+                GatewayIntentBits.DirectMessagePolls,
+            ]
+
+        });
+
+        this.registry = new EntityRegistry();
     }
 
-    this.discordToken = envDiscordToken;
+    public async initialize() {
+        this.registry.register(BotConfig, () => 'app');
+        this.registry.register(GuildInfo, () => 'app');
+        const databasePath = this.databasePath;
+        await repository.initialize({
+            databasePath,
+            entityRegistry: this.registry
+        });
 
-    if (!envManagementGuildId) {
-      throw new Error('MANAGEMENT_GUILD_ID environment variable is required');
+        const existingConfigs = await repository.getAll(BotConfig, 'app');
+        // TODO: Handle migrations if VERSION changes
+        const config = existingConfigs.length > 0 ? existingConfigs[0] : new BotConfig(VERSION);
+
+        if (existingConfigs.length === 0) {
+            await repository.store(config);
+        }
+
+        this.registerCommands();
+
+        this.eventManager.attachHandlers(this.client);
+
+        this.isInitialized = true;
     }
 
-    this.managementGuildId = envManagementGuildId;
-
-    if (!envBotId) {
-      throw new Error('BOT_ID environment variable is required');
+    public async run() {
+        if (!this.isInitialized) {
+            throw new Error('Bot must be initialized before running');
+        }
+        await this.client.login(this.discordToken);
     }
 
-    this.botId = envBotId;
-
-    this.client = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildExpressions,
-        GatewayIntentBits.GuildInvites,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMessageTyping,
-        GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.DirectMessageReactions,
-        GatewayIntentBits.DirectMessageTyping,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildScheduledEvents,
-        GatewayIntentBits.GuildMessagePolls,
-        GatewayIntentBits.DirectMessagePolls,
-      ]
-
-    });
-
-    this.registry = new EntityRegistry();
-    this.guildManagement = new GuildManagement(this.managementGuildId, this.botId, this.eventManager); // intiializes and registers itself
-  }
-
-  public async initialize() {
-    this.registry.register(BotConfig, () => 'app');
-    this.registry.register(GuildInfo, () => 'app');
-    this.isInitialized = true;
-    const databasePath = this.databasePath;
-    await repository.initialize({
-      databasePath,
-      entityRegistry: this.registry
-    });
-
-    const existingConfigs = await repository.getAll(BotConfig, 'app');
-    // TODO: Handle migrations if VERSION changes
-    const config = existingConfigs.length > 0 ? existingConfigs[0] : new BotConfig(VERSION);
-
-    if (existingConfigs.length === 0) {
-      await repository.store(config);
+    private registerCommands() {
+        const guildManagement = new GuildManagement(this.managementGuildId, this.botId);
+        this.commandHandlers.push(guildManagement);
+        this.eventManager.registerHandler(guildManagement);
+        this.eventManager.registerHandler({
+            event: Events.InteractionCreate,
+            handle: async (interaction: Interaction) => {
+                if (!interaction.isChatInputCommand()) return;
+                if (interaction.commandName === guildManagement.data.name) {
+                    await guildManagement.execute(interaction as ChatInputCommandInteraction<CacheType>);
+                }
+            }
+        })
     }
 
-    this.eventManager.attachHandlers(this.client);
+    // private members
+    private discordToken: string;
+    private databasePath: string;
+    private managementGuildId: string;
+    private botId: string;
 
-    await this.client.login(this.discordToken);
-  }
+    private client: Client;
+    private registry: EntityRegistry;
 
-  // private members
-  private discordToken: string;
-  private databasePath: string;
-  private managementGuildId: string;
-  private botId: string;
-
-  private client: Client;
-  private registry: EntityRegistry;
-
-  private eventManager: EventManager = EventManager.getInstance();
-
-  private guildManagement: GuildManagement;
-
-  public isInitialized: boolean = false;
+    private eventManager: EventManager = EventManager.getInstance();
+    private commandHandlers: CommandHandler[] = [];
+    public isInitialized: boolean = false;
 }
