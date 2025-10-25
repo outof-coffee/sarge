@@ -1,4 +1,4 @@
-import { CacheType, ChatInputCommandInteraction, Client, Events, GatewayIntentBits, Interaction } from 'discord.js';
+import { Client, GatewayIntentBits } from 'discord.js';
 import { EntityRegistry, repository } from '@outof-coffee/cordex';
 import { BotConfig } from './config/bot-config.js';
 import { GuildInfo } from './entities/guild-info.js';
@@ -76,8 +76,6 @@ export class Bot {
 
         this.registerCommands();
 
-        this.eventManager.attachHandlers(this.client);
-
         this.isInitialized = true;
     }
 
@@ -85,22 +83,21 @@ export class Bot {
         if (!this.isInitialized) {
             throw new Error('Bot must be initialized before running');
         }
+
+        this.eventManager.attachHandlers(this.client);
+
         await this.client.login(this.discordToken);
     }
 
     private registerCommands() {
         const guildManagement = new GuildManagement(this.managementGuildId, this.botId);
         this.commandHandlers.push(guildManagement);
-        this.eventManager.registerHandler(guildManagement);
-        this.eventManager.registerHandler({
-            event: Events.InteractionCreate,
-            handle: async (interaction: Interaction) => {
-                if (!interaction.isChatInputCommand()) return;
-                if (interaction.commandName === guildManagement.data.name) {
-                    await guildManagement.execute(interaction as ChatInputCommandInteraction<CacheType>);
-                }
+
+        for (const handler of this.commandHandlers) {
+            if (handler.registerCommandEvents) {
+                handler.registerCommandEvents(this.eventManager);
             }
-        })
+        }
     }
 
     // private members
