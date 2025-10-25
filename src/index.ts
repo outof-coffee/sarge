@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import { config as loadEnv } from 'dotenv';
 import { EntityRegistry, repository } from '@outof-coffee/cordex';
 import { BotConfig } from './config/bot-config.js';
+import { GuildInfo, GuildFlag } from './entities/guild-info.js';
 import { VERSION } from './version.js';
 import * as manageCommand from './commands/manage.js';
 
@@ -23,6 +24,7 @@ async function main() {
 
   const registry = new EntityRegistry();
   registry.register(BotConfig, () => 'app');
+  registry.register(GuildInfo, () => 'app');
 
   await repository.initialize({
     databasePath,
@@ -69,6 +71,28 @@ async function main() {
       console.warn('The bot may not have been added to the management guild yet.');
       console.warn(`Please add the bot to the guild using this URL:`);
       console.warn(`https://discord.com/oauth2/authorize?client_id=${botId}`);
+    }
+
+    const now = new Date();
+    const guilds = client.guilds.cache;
+    console.log(`Bot is in ${guilds.size} guild(s)`);
+
+    for (const [guildId, guild] of guilds) {
+      const existingGuildInfos = await repository.getAll(GuildInfo, 'app');
+      const existingInfo = existingGuildInfos.find(g => g.guildId === guildId);
+
+      const guildInfo = new GuildInfo(
+        guildId,
+        guild.name,
+        existingInfo?.joinedAt ?? now,
+        now,
+        guild.memberCount,
+        guild.ownerId,
+        existingInfo?.flag ?? GuildFlag.Green
+      );
+
+      await repository.store(guildInfo);
+      console.log(`Stored/updated guild info for: ${guild.name} (${guildId})`);
     }
   });
 
