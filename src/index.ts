@@ -2,9 +2,8 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import { config as loadEnv } from 'dotenv';
 import { EntityRegistry, repository } from '@outof-coffee/cordex';
 import { BotConfig } from './config/bot-config.js';
+import { VERSION } from './version.js';
 import * as manageCommand from './commands/manage.js';
-
-const VERSION = '0.0.1';
 
 async function main() {
   loadEnv();
@@ -12,6 +11,7 @@ async function main() {
   const discordToken = process.env.DISCORD_TOKEN;
   const databasePath = process.env.DATABASE_PATH || './data/bot-database.json';
   const managementGuildId = process.env.MANAGEMENT_GUILD_ID;
+  const botId = process.env.BOT_ID;
 
   if (!discordToken) {
     throw new Error('DISCORD_TOKEN environment variable is required');
@@ -30,6 +30,7 @@ async function main() {
   });
 
   const existingConfigs = await repository.getAll(BotConfig, 'app');
+  // TODO: Handle migrations if VERSION changes
   const config = existingConfigs.length > 0 ? existingConfigs[0] : new BotConfig(VERSION);
 
   if (existingConfigs.length === 0) {
@@ -37,19 +38,37 @@ async function main() {
   }
 
   const client = new Client({
-    intents: [GatewayIntentBits.Guilds]
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildExpressions,
+      GatewayIntentBits.GuildInvites,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMessageReactions,
+      GatewayIntentBits.GuildMessageTyping,
+      GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.DirectMessageReactions,
+      GatewayIntentBits.DirectMessageTyping,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildScheduledEvents,
+      GatewayIntentBits.GuildMessagePolls,
+      GatewayIntentBits.DirectMessagePolls,
+    ]
   });
 
-  client.once('ready', async () => {
+  client.once('clientReady', async () => {
     console.log(`Logged in as ${client.user?.tag}`);
     console.log(`Bot version: ${config.version}`);
 
-    const managementGuild = client.guilds.cache.get(managementGuildId);
-    if (managementGuild) {
+    try {
+      const managementGuild = await client.guilds.fetch(managementGuildId);
       await managementGuild.commands.set([manageCommand.data.toJSON()]);
       console.log(`Registered commands to guild: ${managementGuild.name}`);
-    } else {
-      console.warn(`Could not find management guild with ID: ${managementGuildId}`);
+    } catch (error) {
+      console.error(`Failed to register commands to guild ${managementGuildId}:`, error);
+      console.warn('The bot may not have been added to the management guild yet.');
+      console.warn(`Please add the bot to the guild using this URL:`);
+      console.warn(`https://discord.com/oauth2/authorize?client_id=${botId}`);
     }
   });
 

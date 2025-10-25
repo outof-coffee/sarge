@@ -21,7 +21,9 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "test": "npx vitest run"
+    "serve": "npm run build && node dist/index.js",
+    "test": "npx vitest run",
+    "version": "node --experimental-strip-types scripts/update-version.ts && git add src/version.ts && git commit -m \"chore: bump version to v$(node -p \"require('./package.json').version\")\" || true"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",
@@ -29,7 +31,7 @@
     "vitest": "^4.0.3"
   },
   "dependencies": {
-    "@outof-coffee/cordex": "^0.0.1",
+    "@outof-coffee/cordex": "^0.0.3",
     "discord.js": "^14.24.0",
     "dotenv": "^17.2.3"
   }
