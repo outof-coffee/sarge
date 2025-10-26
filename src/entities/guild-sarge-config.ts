@@ -24,6 +24,11 @@ export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity 
         ownerType: GuildOwnerType,
         ownerId: string
     ): Promise<boolean | undefined> {
+        // Discord server owners always have access
+        if (interaction.guild && interaction.user.id === interaction.guild.ownerId) {
+            return true;
+        }
+
         if (ownerType === GuildOwnerType.User) {
             return interaction.user.id === ownerId;
         }
