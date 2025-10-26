@@ -67,19 +67,59 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
   // MARK: - CommandHandler implementation
   public data = new SlashCommandBuilder()
     .setName('manage')
-    .setDescription('Management commands');
+    .setDescription('Management commands')
+    .addStringOption(option =>
+      option
+        .setName('action')
+        .setDescription('Management action to perform')
+        .setRequired(false)
+        .setChoices({ name: 'list', value: 'list' })
+    );
 
   public async execute(interaction: CommandInteraction): Promise<void> {
-    const guild = interaction.client.guilds.cache.get(this.managementGuildId);
+    const action = (interaction as ChatInputCommandInteraction).options.getString('action') ?? 'list';
+
     var reply: InteractionReplyOptions = {
       flags: MessageFlags.Ephemeral
     };
-    if (guild) {
-      reply.content = `Management guild: ${guild.name}`;
-    } else {
-      reply.content = 'Could not find management guild';
+
+    switch (action) {
+      case 'list':
+        reply = await this.executeListAction(interaction);
+        break;
+      default:
+        reply.content = `Unknown action: ${action}`;
     }
+
     await interaction.reply(reply);
+  }
+
+  private async executeListAction(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
+    const reply: InteractionReplyOptions = {
+      flags: MessageFlags.Ephemeral
+    };
+
+    try {
+      const allGuildInfos = await repository.getAll(GuildInfo, 'app');
+
+      if (allGuildInfos.length === 0) {
+        reply.content = 'No managed guilds found.';
+        return reply;
+      }
+
+      const guildLines = allGuildInfos
+        .sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime())
+        .map(info => `${info.guildName} (${info.guildId}) [${info.flag.toUpperCase()}] - ${info.memberCount} members`)
+        .slice(0, 20); // Discord message limit consideration
+
+      const content = `**Managed Guilds (${allGuildInfos.length} total)**\n\n${guildLines.join('\n')}`;
+      reply.content = content.length > 2000 ? content.substring(0, 1997) + '...' : content;
+    } catch (error) {
+      console.error('Failed to retrieve guild list:', error);
+      reply.content = 'Failed to retrieve guild list.';
+    }
+
+    return reply;
   }
 
   public registerCommandEvents(eventManager: EventManager) {
