@@ -4,6 +4,7 @@ import { Guild } from 'discord.js';
 export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
   static readonly storageKey = 'guild-registry';
 
+  readonly id: string;
   readonly guildId: string;
   readonly guildName: string;
   readonly joinedAt: Date;
@@ -22,6 +23,7 @@ export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
     flag: GuildFlag = GuildFlag.Green
   ) {
     super();
+    this.id = "guild-" + guildId;
     this.guildId = guildId;
     this.guildName = guildName;
     this.joinedAt = joinedAt;
@@ -29,10 +31,6 @@ export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
     this.memberCount = memberCount;
     this.ownerId = ownerId;
     this.flag = flag;
-  }
-
-  get id(): string {
-    return "guild-" + this.guildId;
   }
 }
 
