@@ -9,7 +9,7 @@ import {
 } from 'discord.js';
 
 import { repository } from '@outof-coffee/cordex';
-import { GuildInfo, calculateGuildFlag } from '../entities/guild-info.js';
+import { GuildInfo, calculateGuildFlag, getGuildFlagEmoji } from '../entities/guild-info.js';
 import { EventHandler, EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
@@ -112,7 +112,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
 
       const guildLines = allGuildInfos
         .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
-        .map(info => `${info.guildName} (${info.guildId}) [${info.flag.toUpperCase()}] - ${info.memberCount} members`)
+        .map(info => `${getGuildFlagEmoji(info.flag)} ${info.guildName} (${info.guildId}) - ${info.memberCount} members`)
         .slice(0, 20); // Discord message limit consideration
 
       const content = `**Managed Guilds (${allGuildInfos.length} total)**\n\n${guildLines.join('\n')}`;
