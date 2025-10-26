@@ -40,6 +40,17 @@ export enum GuildFlag {
   Red = 'red'
 }
 
+export function getGuildFlagEmoji(flag: GuildFlag): string {
+  switch (flag) {
+    case GuildFlag.Red:
+      return ':red_circle:';
+    case GuildFlag.Yellow:
+      return ':yellow_circle:';
+    case GuildFlag.Green:
+      return ':green_circle:';
+  }
+}
+
 export function calculateGuildFlag(existingInfo: GuildInfo | undefined, guildData: Guild): GuildFlag {
   if (!existingInfo) {
     // New guild, determine flag based on member count
