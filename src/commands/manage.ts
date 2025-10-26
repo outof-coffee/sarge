@@ -59,6 +59,10 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
         calculateGuildFlag(existingInfo, guild)
       );
 
+      // Delete any existing entry with this guild ID to avoid duplicates
+      // (Cordex's store() method appends, not updates)
+      const entityId = `guild-${guildId}`;
+      await repository.deleteById(GuildInfo, 'app', entityId);
       await repository.store(guildInfo);
       console.log(`Stored/updated guild info for: ${guild.name} (${guildId})`);
     }
