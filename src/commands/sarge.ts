@@ -229,8 +229,8 @@ export class SargeCommand implements CommandHandler {
                 // First, temporary code to only put this on the development guild; later this will be managed correctly as a global command
                 try {
                     const managementGuild = await client.guilds.fetch(this.managementGuildId);
-                    await managementGuild.commands.set([this.data.toJSON()]);
-                    console.log(`Registered commands to guild: ${managementGuild.name}`);
+                    await managementGuild.commands.create(this.data.toJSON());
+                    console.log(`Registered command to guild: ${managementGuild.name}`);
                 } catch (error) {
                     console.error(`Failed to register commands to guild ${this.managementGuildId}:`, error);
                     console.warn('The bot may not have been added to the management guild yet.');
