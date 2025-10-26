@@ -14,14 +14,18 @@ import { EventHandler, EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
 
+// This is a one-off, snow-flake. No other command should use the management variables in their constructors.
+// Exception: the management guildId can be used to restrict command usage to that guild only while in development.
 export class GuildManagement implements EventHandler<Events.ClientReady>, CommandHandler {
 
   private managementGuildId: string;
   private botId: string;
+  private managementGuildAdminUserId: string;
 
-  constructor(managementGuildId: string, botId: string) {
+  constructor(managementGuildId: string, botId: string, managementGuildAdminUserId: string) {
     this.managementGuildId = managementGuildId;
     this.botId = botId;
+    this.managementGuildAdminUserId = managementGuildAdminUserId;
   }
 
   event: Events.ClientReady = Events.ClientReady;
@@ -81,6 +85,15 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
 
   public async execute(interaction: CommandInteraction): Promise<void> {
     const action = (interaction as ChatInputCommandInteraction).options.getString('action') ?? 'list';
+
+    // Authorization check - only management guild admin can use this command
+    if (interaction.user.id !== this.managementGuildAdminUserId) {
+      await interaction.reply({
+        content: 'You do not have permission to use this command.',
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
 
     var reply: InteractionReplyOptions = {
       flags: MessageFlags.Ephemeral

@@ -10,31 +10,52 @@ import {
 } from 'discord.js';
 
 import { repository } from '@outof-coffee/cordex';
-import { GuildSargeConfig, createGuildSargeConfigFromGuild } from '../entities/guild-sarge-config.js';
+import { GuildSargeConfig, createGuildSargeConfigFromGuild, GuildOwnerType } from '../entities/guild-sarge-config.js';
 import { EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
 
 export class SargeCommand implements CommandHandler {
 
-    public constructor(private managementGuildId: string, private botId: string) {
+    public constructor(
+        private managementGuildId: string,
+        private botId: string
+    ) {
         this.managementGuildId = managementGuildId;
         this.botId = botId;
     }
 
     public data = new SlashCommandBuilder()
         .setName('sarge')
-        .setDescription('Configure Sarge bot settings for this server.');
+        .setDescription('Configure Sarge bot settings for this server.')
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('show')
+                .setDescription('Display current Sarge configuration for this server'))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('set-owner')
+                .setDescription('Set the server owner for Sarge configuration')
+                .addUserOption(option =>
+                    option
+                        .setName('user')
+                        .setDescription('The user to set as server owner')
+                        .setRequired(false))
+                .addRoleOption(option =>
+                    option
+                        .setName('role')
+                        .setDescription('The role to set as server owner')
+                        .setRequired(false)));
 
     // MARK: - CommandHandler implementation
     public async execute(interaction: CommandInteraction<CacheType>): Promise<void> {
-        const action = (interaction as ChatInputCommandInteraction).options.getString('action') ?? 'show';
+        const subcommand = (interaction as ChatInputCommandInteraction).options.getSubcommand();
 
         var reply: InteractionReplyOptions= {
             flags: MessageFlags.Ephemeral
         };
 
-        switch (action) {
+        switch (subcommand) {
             case 'show':
                 const interactionGuild = interaction.guild;
                 if (!interactionGuild) {
@@ -43,8 +64,11 @@ export class SargeCommand implements CommandHandler {
                 }
                 reply = await this.executeShowAction(interactionGuild);
                 break;
+            case 'set-owner':
+                reply = await this.executeSetOwnerAction(interaction as ChatInputCommandInteraction);
+                break;
             default:
-                reply.content = `Unknown action: ${action}`;
+                reply.content = `Unknown subcommand: ${subcommand}`;
                 break;
         }
 
@@ -79,6 +103,100 @@ export class SargeCommand implements CommandHandler {
                    `Owner Type: ${guildSargeConfig.ownerType}`;
 
         reply.content = content;
+        return reply;
+    }
+
+    private async executeSetOwnerAction(interaction: ChatInputCommandInteraction): Promise<InteractionReplyOptions> {
+        const reply: InteractionReplyOptions = {
+            flags: MessageFlags.Ephemeral
+        };
+
+        // Validate guild context
+        const guild = interaction.guild;
+        if (!guild) {
+            reply.content = 'This command can only be used in a server (guild).';
+            return reply;
+        }
+
+        // Extract both user and role options
+        const targetUser = interaction.options.getUser('user', false);
+        const targetRole = interaction.options.getRole('role', false);
+
+        // Validate: exactly one option provided
+        if (!targetUser && !targetRole) {
+            reply.content = 'You must provide either a user or a role.';
+            return reply;
+        }
+
+        if (targetUser && targetRole) {
+            reply.content = 'You can only set either a user or a role as owner, not both.';
+            return reply;
+        }
+
+        let ownerId: string;
+        let ownerType: GuildOwnerType;
+        let successMessage: string;
+
+        // Handle user option
+        if (targetUser) {
+            // Validate: user is not a bot
+            if (targetUser.bot) {
+                reply.content = 'Cannot set a bot as the server owner.';
+                return reply;
+            }
+
+            // Validate: user exists in the target guild
+            try {
+                await guild.members.fetch(targetUser.id);
+            } catch (error) {
+                reply.content = `User <@${targetUser.id}> is not a member of this server.`;
+                return reply;
+            }
+
+            ownerId = targetUser.id;
+            ownerType = GuildOwnerType.User;
+            successMessage = `Server owner has been set to <@${targetUser.id}>.`;
+        }
+        // Handle role option
+        else {
+            // Validate: role exists in the guild
+            try {
+                await guild.roles.fetch(targetRole!.id);
+            } catch (error) {
+                reply.content = `Role <@&${targetRole!.id}> does not exist in this server.`;
+                return reply;
+            }
+
+            ownerId = targetRole!.id;
+            ownerType = GuildOwnerType.Role;
+            successMessage = `Server owner has been set to <@&${targetRole!.id}>.`;
+        }
+
+        // Fetch existing config
+        const queryResult = await repository.query(GuildSargeConfig, guild.id, {
+            filter: (config) => config.id === "sarge-config-" + guild.id,
+            limit: 1
+        });
+
+        let existingConfig = queryResult.entities[0];
+
+        // Create config if it doesn't exist
+        if (!existingConfig) {
+            existingConfig = createGuildSargeConfigFromGuild(guild);
+        }
+
+        // Create updated config with new owner
+        const updatedConfig = new GuildSargeConfig(
+            existingConfig.guildId,
+            existingConfig.guildName,
+            ownerId,
+            ownerType
+        );
+
+        // Store the updated config
+        await repository.store(updatedConfig);
+
+        reply.content = successMessage;
         return reply;
     }
 

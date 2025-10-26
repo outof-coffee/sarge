@@ -105,7 +105,7 @@ export class Bot {
 
     // MARK: - Private methods
     private registerCommands() {
-        const guildManagement = new GuildManagement(this.managementGuildId, this.botId); // needed as management-only command
+        const guildManagement = new GuildManagement(this.managementGuildId, this.botId, this.managementGuildAdminUserId); // needed as management-only command
         const sarge = new SargeCommand(this.managementGuildId, this.botId); // TODO: remove parameters when no longer needed
         this.commandHandlers.push(guildManagement);
         this.commandHandlers.push(sarge);
