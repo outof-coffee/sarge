@@ -57,12 +57,7 @@ export class SargeCommand implements CommandHandler {
 
         switch (subcommand) {
             case 'show':
-                const interactionGuild = interaction.guild;
-                if (!interactionGuild) {
-                    reply.content = 'This command can only be used in a server (guild).';
-                    break;
-                }
-                reply = await this.executeShowAction(interactionGuild);
+                reply = await this.executeShowAction(interaction as ChatInputCommandInteraction);
                 break;
             case 'set-owner':
                 reply = await this.executeSetOwnerAction(interaction as ChatInputCommandInteraction);
@@ -75,10 +70,16 @@ export class SargeCommand implements CommandHandler {
         await interaction.reply(reply);
     }
 
-    private async executeShowAction(guild: Guild): Promise<InteractionReplyOptions> {
+    private async executeShowAction(interaction: ChatInputCommandInteraction): Promise<InteractionReplyOptions> {
         const reply: InteractionReplyOptions = {
             flags: MessageFlags.Ephemeral
         };
+
+        const guild = interaction.guild;
+        if (!guild) {
+            reply.content = 'This command can only be used in a server (guild).';
+            return reply;
+        }
 
         // Check if a GuildSargeConfig already exists for this guild
         const queryResult = await repository.query(GuildSargeConfig, guild.id, {
@@ -97,10 +98,28 @@ export class SargeCommand implements CommandHandler {
             content += `A new configuration has been created with default settings.\n`;
         }
 
+        // Check authorization
+        const isAuthorized = await GuildSargeConfig.isUserAuthorized(
+            interaction,
+            guildSargeConfig.ownerType,
+            guildSargeConfig.serverOwnerId
+        );
+
+        if (isAuthorized === false) {
+            reply.content = `Sorry, ${interaction.user.displayName}, I'm afraid I can't do that.`;
+            return reply;
+        }
+
+        // TODO: Handle deleted users/roles in appropriate event handlers (future development cycle)
+        const ownerDisplay = await GuildSargeConfig.getOwnerDisplay(
+            guild,
+            guildSargeConfig.ownerType,
+            guildSargeConfig.serverOwnerId
+        );
+
         content += `Sarge bot is configured for this server.\n` +
                    `Server Name: ${guildSargeConfig.guildName}\n` +
-                   `Server Owner ID: ${guildSargeConfig.serverOwnerId}\n` +
-                   `Owner Type: ${guildSargeConfig.ownerType}`;
+                   `Server Owner: ${ownerDisplay}`;
 
         reply.content = content;
         return reply;
@@ -185,12 +204,13 @@ export class SargeCommand implements CommandHandler {
             existingConfig = createGuildSargeConfigFromGuild(guild);
         }
 
-        // Create updated config with new owner
+        // Create updated config with new owner, preserving the original id for persistence
         const updatedConfig = new GuildSargeConfig(
             existingConfig.guildId,
             existingConfig.guildName,
             ownerId,
-            ownerType
+            ownerType,
+            existingConfig.id
         );
 
         // Store the updated config
