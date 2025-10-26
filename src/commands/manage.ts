@@ -85,7 +85,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
 
     switch (action) {
       case 'list':
-        reply = await this.executeListAction(interaction);
+        reply = await this.executeListAction();
         break;
       default:
         reply.content = `Unknown action: ${action}`;
@@ -94,7 +94,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
     await interaction.reply(reply);
   }
 
-  private async executeListAction(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
+  private async executeListAction(): Promise<InteractionReplyOptions> {
     const reply: InteractionReplyOptions = {
       flags: MessageFlags.Ephemeral
     };
