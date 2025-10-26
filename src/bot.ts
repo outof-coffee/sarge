@@ -6,6 +6,8 @@ import { VERSION } from './version.js';
 import { EventManager } from './event-manager.js';
 import { GuildManagement } from './commands/manage.js';
 import { CommandHandler } from './command-handler.js';
+import { GuildSargeConfig } from './entities/guild-sarge-config.js';
+import { SargeCommand } from './commands/sarge.js';
 
 export class Bot {
 
@@ -65,8 +67,11 @@ export class Bot {
     }
 
     public async initialize() {
+        // TODO: find a way to discover this from the commands? maybe pass them into the registry somehow to discover?
         this.registry.register(BotConfig, () => 'app');
         this.registry.register(GuildInfo, () => 'app');
+        this.registry.register(GuildSargeConfig, (entity) => entity.guildId);
+
         const databasePath = this.databasePath;
         await repository.initialize({
             databasePath,
@@ -100,8 +105,10 @@ export class Bot {
 
     // MARK: - Private methods
     private registerCommands() {
-        const guildManagement = new GuildManagement(this.managementGuildId, this.botId);
+        const guildManagement = new GuildManagement(this.managementGuildId, this.botId); // needed as management-only command
+        const sarge = new SargeCommand(this.managementGuildId, this.botId); // TODO: remove parameters when no longer needed
         this.commandHandlers.push(guildManagement);
+        this.commandHandlers.push(sarge);
     }
 
     private attachCommandHandlers() {
