@@ -46,8 +46,11 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
     console.log(`Bot is in ${guilds.size} guild(s)`);
 
     for (const [guildId, guild] of guilds) {
-      const existingGuildInfos = await repository.getAll(GuildInfo, 'app');
-      const existingInfo = existingGuildInfos.find(g => g.guildId === guildId);
+      const queryResult = await repository.query(GuildInfo, 'app', {
+        filter: (g) => g.guildId === guildId,
+        limit: 1
+      });
+      const existingInfo = queryResult.entities[0];
 
       const guildInfo = new GuildInfo(
         guildId,
@@ -59,11 +62,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
         calculateGuildFlag(existingInfo, guild)
       );
 
-      // Delete any existing entry with this guild ID to avoid duplicates
-      // (Cordex's store() method appends, not updates)
-      const entityId = `guild-${guildId}`;
-      await repository.deleteById(GuildInfo, 'app', entityId);
-      await repository.store(guildInfo);
+      await repository.storeUnique(guildInfo);
       console.log(`Stored/updated guild info for: ${guild.name} (${guildId})`);
     }
   }
