@@ -1,7 +1,8 @@
 import { DatabaseEntity, IdentifiedEntity } from '@outof-coffee/cordex';
-import { Guild } from 'discord.js';
+import { EmbedBuilder, Colors, Guild } from 'discord.js';
+import { Embeddable } from '../utilities/embed-renderer.js';
 
-export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
+export class GuildInfo extends DatabaseEntity implements IdentifiedEntity, Embeddable {
   static readonly storageKey = 'guild-registry';
 
   readonly id: string;
@@ -31,6 +32,35 @@ export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
     this.memberCount = memberCount;
     this.ownerId = ownerId;
     this.flag = flag;
+  }
+
+  async toEmbed(): Promise<EmbedBuilder> {
+    const flagEmoji = getGuildFlagEmoji(this.flag);
+    const color = this.getFlagColor();
+
+    return new EmbedBuilder()
+      .setTitle(`${flagEmoji} ${this.guildName}`)
+      .setColor(color)
+      .addFields(
+        { name: 'Guild ID', value: this.guildId, inline: true },
+        { name: 'Member Count', value: this.memberCount.toString(), inline: true },
+        { name: 'Flag Status', value: this.flag, inline: true },
+        { name: 'Joined Date', value: this.joinedAt.toISOString(), inline: true },
+        { name: 'Last Seen', value: this.lastSeen.toISOString(), inline: true },
+        { name: 'Owner ID', value: this.ownerId, inline: true }
+      )
+      .setTimestamp();
+  }
+
+  private getFlagColor(): number {
+    switch (this.flag) {
+      case GuildFlag.Red:
+        return Colors.Red;
+      case GuildFlag.Yellow:
+        return Colors.Yellow;
+      case GuildFlag.Green:
+        return Colors.Green;
+    }
   }
 }
 
