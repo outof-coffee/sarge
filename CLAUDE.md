@@ -177,41 +177,6 @@ export class ComplexCommand implements CommandHandler {
 
 Commands can also implement `EventHandler` interfaces for lifecycle events (e.g., `ClientReady` for startup tasks).
 
-### Global Command Registration (Pre-0.1.0)
-
-**CRITICAL**: During pre-0.1.0 development, commands intended to be global after release must temporarily register only to the management guild for testing.
-
-**Pattern** (see [sarge.ts](src/commands/sarge.ts:92-103)):
-```typescript
-registerCommandEvents(eventManager: EventManager) {
-  eventManager.registerHandler({
-    event: Events.ClientReady,
-    handle: async (client: Client) => {
-      // Temporary: Register to management guild only during development
-      try {
-        const managementGuild = await client.guilds.fetch(this.managementGuildId);
-        await managementGuild.commands.set([this.data.toJSON()]);
-        console.log(`Registered commands to guild: ${managementGuild.name}`);
-      } catch (error) {
-        console.error(`Failed to register commands to guild ${this.managementGuildId}:`, error);
-      }
-
-      // TODO: Uncomment for global registration post-0.1.0
-      // await client.application?.commands.set([this.data.toJSON()]);
-
-      // ... rest of ClientReady logic
-    }
-  });
-}
-```
-
-**Guidelines:**
-- Commands must accept `managementGuildId` and `botId` constructor parameters during pre-0.1.0
-- Use guild-specific registration (`guild.commands.set()`) instead of global (`client.application?.commands.set()`)
-- Include TODO comment marking the global registration code for post-0.1.0
-- See [bot.ts:109](src/bot.ts#L109) TODO for future removal of these temporary constructor parameters
-- Management-only commands (like `/manage`) should remain guild-scoped permanently
-
 ### Cordex Integration
 
 **Current Implementation** (see [bot.ts](src/bot.ts)):
