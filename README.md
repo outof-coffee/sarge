@@ -8,6 +8,36 @@ A Discord bot for managing nerds playing in an MMO guild, tribe, or corporation.
 - Management commands for guild oversight
 - Persistent data storage with entity-based architecture
 
+## Commands
+
+### `/manage`
+
+Management command for guild oversight (registered to management guild only).
+
+**Parameters:**
+- `action` (optional): The management action to perform. Defaults to `list` if not specified.
+
+**Actions:**
+
+#### `list`
+Displays all guilds where the bot is present, sorted by most recently joined.
+
+**Output:**
+- Guild name and ID
+- Current flag status (GREEN/YELLOW/RED)
+- Member count
+
+The response is ephemeral (only visible to you) and limited to the first 20 guilds to respect Discord's message length constraints.
+
+**Example output:**
+```
+Managed Guilds (3 total)
+
+My New Server (123456789012345678) [GREEN] - 42 members
+Another Guild (234567890123456789) [YELLOW] - 150 members
+Old Server (345678901234567890) [GREEN] - 12 members
+```
+
 ## Requirements
 
 - Node.js v22.17.0 or higher
