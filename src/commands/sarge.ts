@@ -83,12 +83,7 @@ export class SargeCommand implements CommandHandler {
         }
 
         // Check if a GuildSargeConfig already exists for this guild
-        const queryResult = await repository.query(GuildSargeConfig, guild.id, {
-            filter: (config) => config.id === "sarge-config-" + guild.id,
-            limit: 1
-        });
-
-        let guildSargeConfig = queryResult.entities[0];
+        let guildSargeConfig = await getGuildSargeConfig(guild.id);
         let isNewConfig = false;
 
         if (!guildSargeConfig) {
@@ -294,6 +289,19 @@ async function getGuildSargeConfig(guildId: string): Promise<GuildSargeConfig | 
         limit: 1
     });
 
-    const guildSargeConfig = queryResult.entities[0] || null;
+    const rawConfig = queryResult.entities[0];
+    if (!rawConfig) {
+        return null;
+    }
+
+    // Reconstruct the entity to restore prototype methods (toEmbed, etc.)
+    const guildSargeConfig = new GuildSargeConfig(
+        rawConfig.guildId,
+        rawConfig.guildName,
+        rawConfig.serverOwnerId,
+        rawConfig.ownerType,
+        rawConfig.id
+    );
+
     return guildSargeConfig;
 }
