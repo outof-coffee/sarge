@@ -1,7 +1,8 @@
 import { DiscordEntity, IdentifiedEntity } from '@outof-coffee/cordex';
-import { Guild, CommandInteraction, CacheType } from 'discord.js';
+import { Guild, CommandInteraction, CacheType, EmbedBuilder, Colors } from 'discord.js';
+import { Embeddable } from '../utilities/embed-renderer.js';
 
-export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity {
+export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity, Embeddable {
     static readonly storageKey = 'guild-sarge-config';
     
     readonly id: string;
@@ -94,6 +95,30 @@ export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity 
         }
 
         return `\`[Unknown] (${type})\``;
+    }
+
+    // Mark: - Embeddable implementation
+    public async toEmbed(guild: Guild, isNewConfig: boolean = false): Promise<EmbedBuilder> {
+        const ownerDisplay = await GuildSargeConfig.getOwnerDisplay(
+            guild,
+            this.ownerType,
+            this.serverOwnerId
+        );
+
+        const embed = new EmbedBuilder()
+            .setTitle('Sarge Configuration')
+            .setColor(Colors.Blurple)
+            .addFields(
+                { name: 'Server Name', value: this.guildName, inline: false },
+                { name: 'Server Owner', value: ownerDisplay, inline: false }
+            )
+            .setTimestamp();
+
+        if (isNewConfig) {
+            embed.setDescription('A new configuration has been created with default settings.');
+        }
+
+        return embed;
     }
 }
 

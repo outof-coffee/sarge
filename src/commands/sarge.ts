@@ -1,4 +1,4 @@
-import { 
+import {
     SlashCommandBuilder,
     CommandInteraction,
     ChatInputCommandInteraction,
@@ -14,6 +14,7 @@ import { GuildSargeConfig, createGuildSargeConfigFromGuild, GuildOwnerType } fro
 import { EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
+import { applyEmbedToReply } from '../utilities/embed-renderer.js';
 
 export class SargeCommand implements CommandHandler {
 
@@ -88,14 +89,13 @@ export class SargeCommand implements CommandHandler {
         });
 
         let guildSargeConfig = queryResult.entities[0];
-
-        var content: string = '';
+        let isNewConfig = false;
 
         if (!guildSargeConfig) {
             // Create a new GuildSargeConfig if it doesn't exist
             guildSargeConfig = createGuildSargeConfigFromGuild(guild);
             await repository.storeUnique(guildSargeConfig);
-            content += `A new configuration has been created with default settings.\n`;
+            isNewConfig = true;
         }
 
         // Check authorization
@@ -110,19 +110,9 @@ export class SargeCommand implements CommandHandler {
             return reply;
         }
 
-        // TODO: Handle deleted users/roles in appropriate event handlers (future development cycle)
-        const ownerDisplay = await GuildSargeConfig.getOwnerDisplay(
-            guild,
-            guildSargeConfig.ownerType,
-            guildSargeConfig.serverOwnerId
-        );
-
-        content += `Sarge bot is configured for this server.\n` +
-                   `Server Name: ${guildSargeConfig.guildName}\n` +
-                   `Server Owner: ${ownerDisplay}`;
-
-        reply.content = content;
-        return reply;
+        // Generate embed and apply to reply
+        const embed = await guildSargeConfig.toEmbed(guild, isNewConfig);
+        return applyEmbedToReply(reply, embed);
     }
 
     private async executeSetOwnerAction(interaction: ChatInputCommandInteraction): Promise<InteractionReplyOptions> {
