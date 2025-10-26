@@ -192,12 +192,7 @@ export class SargeCommand implements CommandHandler {
         }
 
         // Fetch existing config
-        const queryResult = await repository.query(GuildSargeConfig, guild.id, {
-            filter: (config) => config.id === "sarge-config-" + guild.id,
-            limit: 1
-        });
-
-        let existingConfig = queryResult.entities[0];
+        let existingConfig = await getGuildSargeConfig(guild.id);
 
         // Create config if it doesn't exist
         if (!existingConfig) {
@@ -279,12 +274,7 @@ export class SargeCommand implements CommandHandler {
 
 // Check and create GuildSargeConfig for all guilds the bot is in on events that matter
 export async function handleGuildConfigValidationEvent(guild: Guild) {
-    const queryResult = await repository.query(GuildSargeConfig, guild.id, {
-        filter: (config) => config.id === "sarge-config-" + guild.id,
-        limit: 1
-    });
-
-    let guildSargeConfig = queryResult.entities[0];
+    let guildSargeConfig = await getGuildSargeConfig(guild.id);
 
     if (!guildSargeConfig) {
         // Create a new GuildSargeConfig if it doesn't exist
@@ -296,12 +286,7 @@ export async function handleGuildConfigValidationEvent(guild: Guild) {
 
 // Delete GuildSargeConfig helper function, for when the bot leaves the guild or is removed another way
 export async function handleGuildConfigDeletionEvent(guildId: string) {
-    const queryResult = await repository.query(GuildSargeConfig, guildId, {
-        filter: (config) => config.id === "sarge-config-" + guildId,
-        limit: 1
-    });
-
-    const guildSargeConfig = queryResult.entities[0];
+    const guildSargeConfig = await getGuildSargeConfig(guildId);
 
     if (guildSargeConfig) {
         await repository.deleteUnique(
@@ -311,4 +296,14 @@ export async function handleGuildConfigDeletionEvent(guildId: string) {
         );
         // console.log(`Deleted GuildSargeConfig for guild ID: ${guildId}`);
     }
+}
+
+async function getGuildSargeConfig(guildId: string): Promise<GuildSargeConfig | null> {
+    const queryResult = await repository.query(GuildSargeConfig, guildId, {
+        filter: (config) => config.id === "sarge-config-" + guildId,
+        limit: 1
+    });
+
+    const guildSargeConfig = queryResult.entities[0] || null;
+    return guildSargeConfig;
 }
