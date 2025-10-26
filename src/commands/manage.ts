@@ -108,7 +108,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
       }
 
       const guildLines = allGuildInfos
-        .sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime())
+        .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
         .map(info => `${info.guildName} (${info.guildId}) [${info.flag.toUpperCase()}] - ${info.memberCount} members`)
         .slice(0, 20); // Discord message limit consideration
 
