@@ -12,6 +12,7 @@ export class Bot {
     constructor() {
         const envDiscordToken = process.env.DISCORD_TOKEN;
         const envManagementGuildId = process.env.MANAGEMENT_GUILD_ID;
+        const envManagementGuildAdminUserId = process.env.MANAGEMENT_GUILD_ADMIN_USER_ID; // TODO: make this optional if a role id is provided instead
         const envBotId = process.env.BOT_ID;
 
         this.databasePath = process.env.DATABASE_PATH || './data/bot-database.json';
@@ -27,6 +28,12 @@ export class Bot {
         }
 
         this.managementGuildId = envManagementGuildId;
+
+        if (!envManagementGuildAdminUserId) {
+            throw new Error('MANAGEMENT_GUILD_ADMIN_USER_ID environment variable is required');
+        }
+
+        this.managementGuildAdminUserId = envManagementGuildAdminUserId;
 
         if (!envBotId) {
             throw new Error('BOT_ID environment variable is required');
@@ -120,6 +127,7 @@ export class Bot {
     private discordToken: string;
     private databasePath: string;
     private managementGuildId: string;
+    private managementGuildAdminUserId: string;
     private botId: string;
 
     private client: Client;
