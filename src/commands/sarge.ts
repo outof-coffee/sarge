@@ -94,7 +94,7 @@ export class SargeCommand implements CommandHandler {
         if (!guildSargeConfig) {
             // Create a new GuildSargeConfig if it doesn't exist
             guildSargeConfig = createGuildSargeConfigFromGuild(guild);
-            await repository.store(guildSargeConfig);
+            await repository.storeUnique(guildSargeConfig);
             content += `A new configuration has been created with default settings.\n`;
         }
 
@@ -213,8 +213,8 @@ export class SargeCommand implements CommandHandler {
             existingConfig.id
         );
 
-        // Store the updated config
-        await repository.store(updatedConfig);
+        // Store the updated config using storeUnique to prevent duplicates
+        await repository.storeUnique(updatedConfig);
 
         reply.content = successMessage;
         return reply;
