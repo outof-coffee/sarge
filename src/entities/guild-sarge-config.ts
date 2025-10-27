@@ -1,6 +1,7 @@
 import { DiscordEntity, IdentifiedEntity } from '@outof-coffee/cordex';
 import { Guild, CommandInteraction, CacheType, EmbedBuilder, Colors } from 'discord.js';
 import { Embeddable } from '../utilities/embed-renderer.js';
+import { renderTemplate, BaseTheme } from '../utilities/theme/index.js';
 
 export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity, Embeddable {
     static readonly storageKey = 'guild-sarge-config';
@@ -59,7 +60,7 @@ export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity,
             return member.displayName;
         } catch (error) {
             // TODO: Handle deleted users in a guild member removal event handler (future development cycle)
-            return '[Unknown User]';
+            return `[${renderTemplate('{{placeholder}}')} User]`;
         }
     }
 
@@ -68,12 +69,12 @@ export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity,
             const role = await guild.roles.fetch(roleId);
             if (!role) {
                 // TODO: Handle deleted roles in a role deletion event handler (future development cycle)
-                return '[Unknown Role]';
+                return `[${renderTemplate('{{placeholder}}')} Role]`;
             }
             return role.name;
         } catch (error) {
             // TODO: Handle deleted roles in a role deletion event handler (future development cycle)
-            return '[Unknown Role]';
+            return `[${renderTemplate('{{placeholder}}')} Role]`;
         }
     }
 
@@ -94,7 +95,7 @@ export class GuildSargeConfig extends DiscordEntity implements IdentifiedEntity,
             return `\`@${displayName} (${type})\``;
         }
 
-        return `\`[Unknown] (${type})\``;
+        return `\`[${renderTemplate('{{placeholder}}')}] (${type})\``;
     }
 
     // Mark: - Embeddable implementation

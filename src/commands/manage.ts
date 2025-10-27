@@ -13,6 +13,7 @@ import { GuildInfo, calculateGuildFlag, getGuildFlagEmoji } from '../entities/gu
 import { EventHandler, EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
+import { renderTemplate, BaseTheme } from '../utilities/theme/index.js';
 
 // This is a one-off, snow-flake. No other command should use the management variables in their constructors.
 // Exception: the management guildId can be used to restrict command usage to that guild only while in development.
@@ -89,7 +90,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
     // Authorization check - only management guild admin can use this command
     if (interaction.user.id !== this.managementGuildAdminUserId) {
       await interaction.reply({
-        content: 'You do not have permission to use this command.',
+        content: renderTemplate("{{dismissal}}. You're not the boss of me, man."),
         flags: MessageFlags.Ephemeral
       });
       return;
@@ -104,7 +105,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
         reply = await this.executeListAction();
         break;
       default:
-        reply.content = `Unknown action: ${action}`;
+        reply.content = renderTemplate(`{{unknown}} action: ${action}`);
     }
 
     await interaction.reply(reply);
@@ -119,7 +120,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
       const allGuildInfos = await repository.getAll(GuildInfo, 'app');
 
       if (allGuildInfos.length === 0) {
-        reply.content = 'No managed guilds found.';
+        reply.content = renderTemplate('{{not-found}}: No managed guilds.');
         return reply;
       }
 
@@ -132,7 +133,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
       reply.content = content.length > 2000 ? content.substring(0, 1997) + '...' : content;
     } catch (error) {
       console.error('Failed to retrieve guild list:', error);
-      reply.content = 'Failed to retrieve guild list.';
+      reply.content = renderTemplate('{{error}}: Failed to retrieve guild list.');
     }
 
     return reply;

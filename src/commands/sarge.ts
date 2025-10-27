@@ -15,6 +15,7 @@ import { EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
 import { applyEmbedToReply } from '../utilities/embed-renderer.js';
+import { renderTemplate, BaseTheme } from '../utilities/theme/index.js';
 
 export class SargeCommand implements CommandHandler {
 
@@ -64,7 +65,7 @@ export class SargeCommand implements CommandHandler {
                 reply = await this.executeSetOwnerAction(interaction as ChatInputCommandInteraction);
                 break;
             default:
-                reply.content = `Unknown subcommand: ${subcommand}`;
+                reply.content = renderTemplate(`{{unknown}} subcommand: ${subcommand}`);
                 break;
         }
 
@@ -78,7 +79,7 @@ export class SargeCommand implements CommandHandler {
 
         const guild = interaction.guild;
         if (!guild) {
-            reply.content = 'This command can only be used in a server (guild).';
+            reply.content = renderTemplate('{{guild-only}}: This command can only be used in a server.');
             return reply;
         }
 
@@ -101,7 +102,7 @@ export class SargeCommand implements CommandHandler {
         );
 
         if (isAuthorized === false) {
-            reply.content = `Sorry, ${interaction.user.displayName}, I'm afraid I can't do that.`;
+            reply.content = renderTemplate(`{{sorry}}, ${interaction.user.displayName}. {{dismissal}}.`);
             return reply;
         }
 
@@ -118,7 +119,7 @@ export class SargeCommand implements CommandHandler {
         // Validate guild context
         const guild = interaction.guild;
         if (!guild) {
-            reply.content = 'This command can only be used in a server (guild).';
+            reply.content = renderTemplate('{{guild-only}}: This command can only be used in a server.');
             return reply;
         }
 
@@ -128,12 +129,12 @@ export class SargeCommand implements CommandHandler {
 
         // Validate: exactly one option provided
         if (!targetUser && !targetRole) {
-            reply.content = 'You must provide either a user or a role.';
+            reply.content = renderTemplate('{{invalid-input}}: You must provide either a user or a role.');
             return reply;
         }
 
         if (targetUser && targetRole) {
-            reply.content = 'You can only set either a user or a role as owner, not both.';
+            reply.content = renderTemplate('{{invalid-input}}: You can only set either a user or a role as owner, not both.');
             return reply;
         }
 
@@ -145,7 +146,7 @@ export class SargeCommand implements CommandHandler {
         if (targetUser) {
             // Validate: user is not a bot
             if (targetUser.bot) {
-                reply.content = 'Cannot set a bot as the server owner.';
+                reply.content = renderTemplate('{{invalid-input}}: Cannot set a bot as the server owner.');
                 return reply;
             }
 
@@ -153,13 +154,13 @@ export class SargeCommand implements CommandHandler {
             try {
                 await guild.members.fetch(targetUser.id);
             } catch (error) {
-                reply.content = `User <@${targetUser.id}> is not a member of this server.`;
+                reply.content = renderTemplate(`{{invalid-input}}: User <@${targetUser.id}> is not a member of this server.`);
                 return reply;
             }
 
             ownerId = targetUser.id;
             ownerType = GuildOwnerType.User;
-            successMessage = `Server owner has been set to <@${targetUser.id}>.`;
+            successMessage = renderTemplate(`{{success}}: Server owner has been set to <@${targetUser.id}>.`);
         }
         // Handle role option
         else {
@@ -167,13 +168,13 @@ export class SargeCommand implements CommandHandler {
             try {
                 await guild.roles.fetch(targetRole!.id);
             } catch (error) {
-                reply.content = `Role <@&${targetRole!.id}> does not exist in this server.`;
+                reply.content = renderTemplate(`{{invalid-input}}: Role <@&${targetRole!.id}> does not exist in this server.`);
                 return reply;
             }
 
             ownerId = targetRole!.id;
             ownerType = GuildOwnerType.Role;
-            successMessage = `Server owner has been set to <@&${targetRole!.id}>.`;
+            successMessage = renderTemplate(`{{success}}: Server owner has been set to <@&${targetRole!.id}>.`);
         }
 
         // Fetch existing config
