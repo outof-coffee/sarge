@@ -32,7 +32,7 @@ Sarge is a Discord bot for managing MMO guild/tribe/corporation members. The pro
   - Pre-0.1.0: No backwards compatibility required
   - Post-0.1.0: Maintain compatibility within minor version (0.1.x)
   - Breaking changes require next minor version (0.2.0, 0.3.0, etc.)
-  - Current branch: `development` targeting 0.1.0 release
+  - Current version: 0.0.1 (pre-release)
 - **Temporal Markers**:
   - NEVER use "new" in comments or naming conventions
   - Avoid any temporal markers indicating when something was added
@@ -60,18 +60,28 @@ npm install           # Install dependencies
 npm version [patch|minor|major]  # Auto-updates src/version.ts
 ```
 
-Note: Node.js version is pinned via `.nvmrc` (version 22).
+Note: Node.js version is pinned via `.nvmrc` (version 22.17.0).
 
 ## Architecture
 
 ### Dependencies
 
-- **@outof-coffee/cordex** - Core data management library providing:
+- **@outof-coffee/cordex** (^0.0.4) - Core data management library providing:
   - Type-safe repository pattern with lowdb (JSON file storage)
   - Entity Registry system for organizing data by guild/user/custom keys
   - Pre-built Discord entity types (GuildConfig, GuildUser, etc.)
   - Write batching and query API
   - Discord ID validation utilities
+
+- **discord.js** (^14.24.0) - Discord API library providing:
+  - Discord bot client and gateway connections
+  - Slash command builders and interaction handling
+  - Event handling for Discord gateway events
+  - Rich embed builders and message formatting
+
+- **dotenv** (^17.2.3) - Environment variable management:
+  - Loads `.env` file into `process.env`
+  - Manages bot credentials and configuration
 
 ### Project Structure
 
@@ -85,9 +95,16 @@ src/
 ├── config/
 │   └── bot-config.ts     # BotConfig entity for storing bot metadata
 ├── entities/
-│   └── guild-info.ts     # GuildInfo entity + guild flag logic
-└── commands/
-    └── manage.ts         # Guild management command handler
+│   ├── guild-info.ts     # GuildInfo entity + guild flag logic
+│   └── guild-sarge-config.ts  # GuildSargeConfig entity + authorization
+├── commands/
+│   ├── manage.ts         # Guild management command handler
+│   └── sarge.ts          # Sarge configuration command handler
+└── utilities/
+    ├── embed-renderer.ts      # Discord embed helpers and Embeddable interface
+    ├── string-templating.ts   # Template string rendering with theme support
+    └── theme/
+        └── base-theme.ts      # Default theme values for string templates
 ```
 
 **Key Components:**
@@ -106,7 +123,15 @@ src/
 
 **Entities:**
 - **BotConfig** ([config/bot-config.ts](src/config/bot-config.ts)): Stores bot metadata (version). App-scoped entity.
-- **GuildInfo** ([entities/guild-info.ts](src/entities/guild-info.ts)): Tracks guild state with flag system (Green/Yellow/Red) based on member count and activity. App-scoped entity implementing `IdentifiedEntity`.
+- **GuildInfo** ([entities/guild-info.ts](src/entities/guild-info.ts)): Tracks guild state with flag system (Green/Yellow/Red) based on member count and activity. App-scoped entity implementing `IdentifiedEntity` and `Embeddable`.
+  - Implements `toEmbed()` for Discord embed generation with color-coded flags
+  - Includes helper functions: `getGuildFlagEmoji()`, `calculateGuildFlag()`
+- **GuildSargeConfig** ([entities/guild-sarge-config.ts](src/entities/guild-sarge-config.ts)): Stores per-guild Sarge configuration including server owner (user or role-based). Guild-scoped entity implementing `IdentifiedEntity` and `Embeddable`.
+  - Supports both User and Role-based ownership via `GuildOwnerType` enum
+  - Implements authorization checking with `isUserAuthorized()` static method
+  - Discord server owners automatically have access regardless of Sarge config
+  - Includes display helpers for resolving user/role names (`resolveUserDisplay`, `resolveRoleDisplay`)
+  - Implements `Embeddable` interface for Discord embed rendering via `toEmbed()`
 
 **Guild Flag System:**
 - **Green** (safe): Default for guilds under 99 members
@@ -119,10 +144,23 @@ src/
   - Updates GuildInfo records for all joined guilds
   - Calculates initial guild flags based on member count
   - Returns ephemeral response with management guild info
+- **/sarge** ([commands/sarge.ts](src/commands/sarge.ts)): Guild configuration command with subcommands:
+  - `/sarge show`: Display current Sarge configuration for the server (ephemeral)
+    - Creates default config on first run if none exists
+    - Checks authorization before showing (requires server owner or configured Sarge owner)
+    - Returns embed with server name and owner info
+  - `/sarge set-owner`: Update server owner (user or role-based)
+    - Validates exactly one option provided (user XOR role)
+    - Prevents bots from being set as owners
+    - Validates membership/role existence in the guild
+    - Uses `repository.storeUnique()` to prevent duplicates
+  - Registers to management guild during development (will be global later)
+  - Automatically creates/validates configs on `ClientReady` and `GuildCreate` events
+  - Deletes configs on `GuildDelete` event (cleanup when bot leaves guild)
 
 **Infrastructure:**
 - Bot initialization with required environment variables (see Environment Variables below)
-- Discord.js client with 13 gateway intents (guilds, members, messages, reactions, DMs, etc.)
+- Discord.js client with 14 gateway intents (guilds, members, messages, reactions, DMs, message content, scheduled events, polls, etc.)
 - Event-driven architecture via EventManager singleton
 - Command framework supporting custom event registration
 
@@ -177,6 +215,92 @@ export class ComplexCommand implements CommandHandler {
 
 Commands can also implement `EventHandler` interfaces for lifecycle events (e.g., `ClientReady` for startup tasks).
 
+### String Templating System
+
+The bot includes a lightweight string templating system for consistent messaging with theme support.
+
+**Key Features** (see [utilities/string-templating.ts](src/utilities/string-templating.ts)):
+- Template syntax: `{{variable-name}}` replaced with theme values
+- Theme support with `TemplateTheme` class
+- Random selection from arrays (e.g., multiple greeting variations)
+- Override mechanism via `withOverride()` for custom themes
+- Regex pattern: `/\{\{([a-zA-Z0-9-]+)\}\}/g`
+- Missing variables resolve to empty string
+
+**Base Theme** ([utilities/theme/base-theme.ts](src/utilities/theme/base-theme.ts)):
+Provides standard message templates via `BaseThemeKeys` enum:
+- **Arrays with variations**: `greeting`, `goodbye`, `dismissal` (multiple options, randomly selected)
+- **Single values**: `placeholder`, `error`, `success`, `invalid-input`, `unknown`, `guild-only`, `not-found`, `sorry`, `acknowledged`
+
+**Usage Example**:
+```typescript
+import { renderTemplate } from './utilities/string-templating.js';
+import { BaseTheme } from './utilities/theme/base-theme.js';
+
+// Simple replacement with default theme
+const message = renderTemplate('{{greeting}}, user!');
+// Returns: "Hello, user!" (randomly selected from greeting array)
+
+// With custom theme override
+const customTheme = BaseTheme.withOverride({ greeting: 'Howdy' });
+const message = renderTemplate('{{greeting}}, partner!', customTheme);
+// Returns: "Howdy, partner!"
+
+// Multiple placeholders
+const error = renderTemplate('{{error}}: {{invalid-input}}');
+// Returns: "Error: Invalid input"
+```
+
+**Implementation Details**:
+- `TemplateTheme` class with index signature `[key: string]: string | string[]`
+- Arrays are normalized by `pickRandomString()` helper (random selection)
+- Used throughout commands for consistent, varied messaging
+- Users can create custom themes with `.withOverride({ key: value })` for context-specific messages
+
+### Embed Rendering Utilities
+
+Reusable helpers for Discord embed creation and manipulation (see [utilities/embed-renderer.ts](src/utilities/embed-renderer.ts)).
+
+**Embeddable Interface**:
+```typescript
+export interface Embeddable {
+    toEmbed(...args: any[]): Promise<EmbedBuilder>;
+}
+```
+Entities can implement this interface to generate their own Discord embeds. Used by `GuildInfo` and `GuildSargeConfig`.
+
+**Helper Functions**:
+- `applyEmbedToReply(reply, embed)`: Adds embed to `InteractionReplyOptions`
+- `truncateField(value, maxLength=1024)`: Truncates field values with ellipsis for Discord limits
+- `truncateTitle(title)`: Truncates to 256 characters
+- `truncateDescription(description)`: Truncates to 4096 characters
+- `formatFieldValue(value, placeholder='N/A')`: Formats nullable fields with placeholder
+
+**Usage Example**:
+```typescript
+import { Embeddable, applyEmbedToReply, formatFieldValue } from './utilities/embed-renderer.js';
+
+// Entity implementing Embeddable
+class MyEntity implements Embeddable {
+  async toEmbed(): Promise<EmbedBuilder> {
+    return new EmbedBuilder()
+      .setTitle(truncateTitle(this.name))
+      .addFields({
+        name: 'Status',
+        value: formatFieldValue(this.status)
+      });
+  }
+}
+
+// Apply to interaction reply
+const embed = await entity.toEmbed();
+const reply = applyEmbedToReply(
+  { flags: MessageFlags.Ephemeral },
+  embed
+);
+await interaction.reply(reply);
+```
+
 ### Cordex Integration
 
 **Current Implementation** (see [bot.ts](src/bot.ts)):
@@ -184,10 +308,12 @@ Commands can also implement `EventHandler` interfaces for lifecycle events (e.g.
 import { EntityRegistry, repository } from '@outof-coffee/cordex';
 import { BotConfig } from './config/bot-config.js';
 import { GuildInfo } from './entities/guild-info.js';
+import { GuildSargeConfig } from './entities/guild-sarge-config.js';
 
 const registry = new EntityRegistry();
 registry.register(BotConfig, () => 'app');
 registry.register(GuildInfo, () => 'app');
+registry.register(GuildSargeConfig, (entity) => entity.guildId);
 
 await repository.initialize({
   databasePath: process.env.DATABASE_PATH || './data/bot-database.json',
@@ -197,6 +323,7 @@ await repository.initialize({
 
 **Entity Organization Patterns:**
 - **Guild-scoped**: `(entity) => entity.guildId` (for per-guild settings like channel/role configs)
+  - Used by GuildSargeConfig (per-guild Sarge configuration)
 - **User-scoped**: `(entity) => entity.userId` (for cross-guild user data)
 - **App-scoped**: `() => 'app'` (for global settings and aggregated data)
   - Used by BotConfig (single instance for bot metadata)
@@ -211,21 +338,45 @@ await repository.initialize({
 ```typescript
 import { DatabaseEntity, IdentifiedEntity } from '@outof-coffee/cordex';
 
-export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
+export class GuildInfo extends DatabaseEntity implements IdentifiedEntity, Embeddable {
   static readonly storageKey = 'guild-registry';
 
-  id: string;  // Format: "guild-{guildId}"
-  guildId: string;
-  // ... other properties
+  readonly id: string;
+  readonly guildId: string;
+  readonly guildName: string;
+  readonly joinedAt: Date;
+  readonly lastSeen: Date;
+  readonly memberCount: number;
+  readonly ownerId: string;
+  readonly flag: GuildFlag;
 
-  constructor(data: Partial<GuildInfo>) {
+  constructor(
+    guildId: string,
+    guildName: string,
+    joinedAt: Date,
+    lastSeen: Date,
+    memberCount: number,
+    ownerId: string,
+    flag: GuildFlag = GuildFlag.Green
+  ) {
     super();
-    this.id = data.id || `guild-${data.guildId}`;
-    // ... initialize properties
+    this.id = "guild-" + guildId;
+    this.guildId = guildId;
+    this.guildName = guildName;
+    this.joinedAt = joinedAt;
+    this.lastSeen = lastSeen;
+    this.memberCount = memberCount;
+    this.ownerId = ownerId;
+    this.flag = flag;
+  }
+
+  async toEmbed(): Promise<EmbedBuilder> {
+    // ... embed implementation
   }
 }
 
-// Storage: repository.store(guildInfo)
+// Storage: repository.storeUnique(guildInfo)
+// Query: repository.query(GuildInfo, 'app', { filter: (g) => g.guildId === id })
 // Retrieval: repository.getAll(GuildInfo, 'app')
 ```
 
@@ -234,6 +385,28 @@ export class GuildInfo extends DatabaseEntity implements IdentifiedEntity {
 - Implement `IdentifiedEntity` for entities with unique IDs (adds `id` property)
 - Implement `Purgeable` for time-based cleanup
 - Always define `static readonly storageKey`
+
+**Repository Operations**:
+```typescript
+// Store entity (may create duplicates if called multiple times)
+await repository.store(entity);
+
+// Store unique entity (prevents duplicates by id - recommended for IdentifiedEntity)
+await repository.storeUnique(entity);
+
+// Query with filter
+const result = await repository.query(EntityClass, scopeKey, {
+  filter: (e) => e.someField === value,
+  limit: 1
+});
+const entity = result.entities[0];
+
+// Get all entities in scope
+const entities = await repository.getAll(EntityClass, scopeKey);
+
+// Delete unique entity by id
+await repository.deleteUnique(EntityClass, scopeKey, entityId);
+```
 
 ## Environment Variables
 
