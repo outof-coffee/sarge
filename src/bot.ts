@@ -11,82 +11,40 @@ import { SargeCommand } from './commands/sarge.js';
 
 export class Bot {
 
+    // MARK: - Constructor
     constructor() {
-        const envDiscordToken = process.env.DISCORD_TOKEN;
-        const envManagementGuildId = process.env.MANAGEMENT_GUILD_ID;
-        const envManagementGuildAdminUserId = process.env.MANAGEMENT_GUILD_ADMIN_USER_ID; // TODO: make this optional if a role id is provided instead
-        const envBotId = process.env.BOT_ID;
+        const { envDiscordToken, envManagementGuildId, envManagementGuildAdminUserId, envBotId } = resolveEnvironment();
+
+        this.discordToken = envDiscordToken;
+        this.managementGuildId = envManagementGuildId;
+        this.managementGuildAdminUserId = envManagementGuildAdminUserId;
+        this.botId = envBotId;
 
         this.databasePath = process.env.DATABASE_PATH || './data/bot-database.json';
 
-        if (!envDiscordToken) {
-            throw new Error('DISCORD_TOKEN environment variable is required');
-        }
-
-        this.discordToken = envDiscordToken;
-
-        if (!envManagementGuildId) {
-            throw new Error('MANAGEMENT_GUILD_ID environment variable is required');
-        }
-
-        this.managementGuildId = envManagementGuildId;
-
-        if (!envManagementGuildAdminUserId) {
-            throw new Error('MANAGEMENT_GUILD_ADMIN_USER_ID environment variable is required');
-        }
-
-        this.managementGuildAdminUserId = envManagementGuildAdminUserId;
-
-        if (!envBotId) {
-            throw new Error('BOT_ID environment variable is required');
-        }
-
-        this.botId = envBotId;
-
         this.client = new Client({
-            intents: [
-                GatewayIntentBits.Guilds,
-                GatewayIntentBits.GuildMembers,
-                GatewayIntentBits.GuildExpressions,
-                GatewayIntentBits.GuildInvites,
-                GatewayIntentBits.GuildMessages,
-                GatewayIntentBits.GuildMessageReactions,
-                GatewayIntentBits.GuildMessageTyping,
-                GatewayIntentBits.DirectMessages,
-                GatewayIntentBits.DirectMessageReactions,
-                GatewayIntentBits.DirectMessageTyping,
-                GatewayIntentBits.MessageContent,
-                GatewayIntentBits.GuildScheduledEvents,
-                GatewayIntentBits.GuildMessagePolls,
-                GatewayIntentBits.DirectMessagePolls,
-            ]
-
+            intents: resolveIntents()
         });
 
         this.registry = new EntityRegistry();
     }
 
+    // MARK: - Public methods
     public async initialize() {
-        // TODO: find a way to discover this from the commands? maybe pass them into the registry somehow to discover?
-        this.registry.register(BotConfig, () => 'app');
-        this.registry.register(GuildInfo, () => 'app');
-        this.registry.register(GuildSargeConfig, (entity) => entity.guildId);
+        // Initialize static data
+        this.registerAppData();
 
-        const databasePath = this.databasePath;
-        await repository.initialize({
-            databasePath,
-            entityRegistry: this.registry
-        });
+        // Register commands and their entities
+        this.registerCommands(
+            new GuildManagement(this.managementGuildId, this.botId, this.managementGuildAdminUserId),
+            new SargeCommand(this.managementGuildId, this.botId)
+        );
 
-        const existingConfigs = await repository.getAll(BotConfig, 'app');
-        // TODO: Handle migrations if VERSION changes
-        const config = existingConfigs.length > 0 ? existingConfigs[0] : new BotConfig(VERSION);
+        // Attach event handlers, including command interactions
+        this.attachHandlers();
 
-        if (existingConfigs.length === 0) {
-            await repository.store(config);
-        }
-
-        this.registerCommands();
+        // Initialize database
+        await this.initializeDatabase();
 
         this.isInitialized = true;
     }
@@ -95,20 +53,44 @@ export class Bot {
         if (!this.isInitialized) {
             throw new Error('Bot must be initialized before running');
         }
-
-        this.attachCommandHandlers();
-
-        this.eventManager.attachHandlers(this.client);
-
         await this.client.login(this.discordToken);
     }
 
     // MARK: - Private methods
-    private registerCommands() {
-        const guildManagement = new GuildManagement(this.managementGuildId, this.botId, this.managementGuildAdminUserId); // needed as management-only command
-        const sarge = new SargeCommand(this.managementGuildId, this.botId); // TODO: remove parameters when no longer needed
-        this.commandHandlers.push(guildManagement);
-        this.commandHandlers.push(sarge);
+    private async initializeDatabase() {
+        const databasePath = this.databasePath;
+        await repository.initialize({
+            databasePath,
+            entityRegistry: this.registry
+        });
+
+        const existingConfigs = await repository.getAll(BotConfig);
+        // TODO: Handle migrations if VERSION changes
+        const config = existingConfigs.length > 0 ? existingConfigs[0] : new BotConfig(VERSION);
+
+        if (existingConfigs.length === 0) {
+            await repository.store(config);
+        }
+    }
+
+    private registerCommands(...commands: CommandHandler[]) {
+        for (const command of commands) {
+            this.commandHandlers.push(command);
+            if (command.registerCommandEntities) {
+                command.registerCommandEntities(this.registry);
+            }
+        }
+    }
+
+    private registerAppData() {
+        this.registry.register(BotConfig, () => 'app');
+        this.registry.register(GuildInfo, () => 'app');
+        this.registry.register(GuildSargeConfig, () => 'app');
+    }
+
+    private attachHandlers() {
+        this.attachCommandHandlers();
+        this.eventManager.attachHandlers(this.client);
     }
 
     private attachCommandHandlers() {
@@ -143,4 +125,56 @@ export class Bot {
     private eventManager: EventManager = EventManager.getInstance();
     private commandHandlers: CommandHandler[] = [];
     public isInitialized: boolean = false;
+}
+
+// MARK: - Private helpers
+function resolveEnvironment(): {
+    envDiscordToken: string,
+    envManagementGuildId: string,
+    envManagementGuildAdminUserId: string,
+    envBotId: string
+} {
+    const envDiscordToken = process.env.DISCORD_TOKEN;
+    const envManagementGuildId = process.env.MANAGEMENT_GUILD_ID;
+    const envManagementGuildAdminUserId = process.env.MANAGEMENT_GUILD_ADMIN_USER_ID; // TODO: make this optional if a role id is provided instead
+    const envBotId = process.env.BOT_ID;
+
+    if (!envDiscordToken) {
+        throw new Error('DISCORD_TOKEN environment variable is required');
+    }
+    if (!envManagementGuildId) {
+        throw new Error('MANAGEMENT_GUILD_ID environment variable is required');
+    }
+    if (!envManagementGuildAdminUserId) {
+        throw new Error('MANAGEMENT_GUILD_ADMIN_USER_ID environment variable is required');
+    }
+    if (!envBotId) {
+        throw new Error('BOT_ID environment variable is required');
+    }
+
+    return {
+        envDiscordToken,
+        envManagementGuildId,
+        envManagementGuildAdminUserId,
+        envBotId
+    };
+}
+
+function resolveIntents(): GatewayIntentBits[] {
+    return [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildExpressions,
+        GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMessageTyping,
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.DirectMessageReactions,
+        GatewayIntentBits.DirectMessageTyping,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildScheduledEvents,
+        GatewayIntentBits.GuildMessagePolls,
+        GatewayIntentBits.DirectMessagePolls,
+    ]
 }

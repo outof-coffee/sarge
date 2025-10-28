@@ -9,8 +9,8 @@ import {
     Guild
 } from 'discord.js';
 
-import { repository } from '@outof-coffee/cordex';
-import { GuildSargeConfig, createGuildSargeConfigFromGuild, GuildOwnerType } from '../entities/guild-sarge-config.js';
+import { EntityRegistry, repository } from '@outof-coffee/cordex';
+import { GuildSargeConfig, createGuildSargeConfigFromGuild, GuildOwnerType, getGuildSargeConfig } from '../entities/guild-sarge-config.js';
 import { EventManager } from '../event-manager.js';
 import { Events, Client } from 'discord.js';
 import { CommandHandler } from '../command-handler.js';
@@ -277,32 +277,10 @@ export async function handleGuildConfigDeletionEvent(guildId: string) {
     if (guildSargeConfig) {
         await repository.deleteUnique(
             GuildSargeConfig,
-            guildSargeConfig.guildId,
             guildSargeConfig.id
         );
         // console.log(`Deleted GuildSargeConfig for guild ID: ${guildId}`);
     }
 }
 
-async function getGuildSargeConfig(guildId: string): Promise<GuildSargeConfig | null> {
-    const queryResult = await repository.query(GuildSargeConfig, guildId, {
-        filter: (config) => config.id === "sarge-config-" + guildId,
-        limit: 1
-    });
-
-    const rawConfig = queryResult.entities[0];
-    if (!rawConfig) {
-        return null;
-    }
-
-    // Reconstruct the entity to restore prototype methods (toEmbed, etc.)
-    const guildSargeConfig = new GuildSargeConfig(
-        rawConfig.guildId,
-        rawConfig.guildName,
-        rawConfig.serverOwnerId,
-        rawConfig.ownerType,
-        rawConfig.id
-    );
-
-    return guildSargeConfig;
-}
+// const entity = await repository.findOneByField(YourEntity, 'id', 'your-entity-id');
