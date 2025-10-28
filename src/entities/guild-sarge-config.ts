@@ -1,4 +1,4 @@
-import { DiscordEntity, IdentifiedEntity } from '@outof-coffee/cordex';
+import { DiscordEntity, IdentifiedEntity, repository } from '@outof-coffee/cordex';
 import { Guild, CommandInteraction, CacheType, EmbedBuilder, Colors } from 'discord.js';
 import { Embeddable } from '../utilities/embed-renderer.js';
 import { renderTemplate, BaseTheme } from '../utilities/theme/index.js';
@@ -136,4 +136,24 @@ export function createGuildSargeConfigFromGuild(guild: Guild): GuildSargeConfig 
         guild.ownerId,
         GuildOwnerType.User // default to User, can be changed later
     );
+}
+
+export async function getGuildSargeConfig(guildId: string): Promise<GuildSargeConfig | null> {
+    const entityId = "sarge-config-" + guildId;
+    const rawConfig = await repository.getById(GuildSargeConfig, entityId);
+
+    if (!rawConfig) {
+        return null;
+    }
+
+    // Reconstruct the entity to restore prototype methods (toEmbed, etc.)
+    const guildSargeConfig = new GuildSargeConfig(
+        rawConfig.guildId,
+        rawConfig.guildName,
+        rawConfig.serverOwnerId,
+        rawConfig.ownerType,
+        rawConfig.id
+    );
+
+    return guildSargeConfig;
 }

@@ -51,7 +51,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
     console.log(`Bot is in ${guilds.size} guild(s)`);
 
     for (const [guildId, guild] of guilds) {
-      const queryResult = await repository.query(GuildInfo, 'app', {
+      const queryResult = await repository.query(GuildInfo, {
         filter: (g) => g.guildId === guildId,
         limit: 1
       });
@@ -117,7 +117,7 @@ export class GuildManagement implements EventHandler<Events.ClientReady>, Comman
     };
 
     try {
-      const allGuildInfos = await repository.getAll(GuildInfo, 'app');
+      const allGuildInfos = await repository.getAll(GuildInfo);
 
       if (allGuildInfos.length === 0) {
         reply.content = renderTemplate('{{not-found}}: No managed guilds.');
